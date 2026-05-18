@@ -1,0 +1,22 @@
+{
+    "name": "pvz-phaser",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview"
+    },
+    "devDependencies": {
+        "vite": "^5.4.21"
+    },
+    "dependencies": {
+        "phaser": "^3.80.1"
+    },
+    "description": "一个基于 **Phaser 3** 和 **Vite** 构建的高品质“植物大战僵尸”复刻版。本作不仅完美还原了经典的核心玩法，还通过现代化的视觉设计和底层逻辑重构，带来了更稳定、更丝滑的游戏体验。",
+    "main": "vite.config.js",
+    "keywords": [],
+    "author": "",
+    "license": "ISC"
+}
