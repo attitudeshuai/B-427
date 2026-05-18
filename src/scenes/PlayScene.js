@@ -17,6 +17,7 @@ export class PlayScene extends Phaser.Scene {
         this.isWin = false;
         this.zombieSpawnRate = config.zombieSpawnRate;
         this.zombiesSpawned = 0;
+        this.zombiesKilled = 0;
         this.zombiesTarget = 50; // More zombies for the all-star cast
     }
 
@@ -368,33 +369,79 @@ export class PlayScene extends Phaser.Scene {
         this.time.delayedCall(100, () => { if (zombie.active && !zombie.isSlowed) zombie.clearTint(); });
 
         if (zombie.hp <= 0) {
+            this.zombiesKilled++;
             zombie.destroy();
         }
+    }
+
+    calculateScore() {
+        const remainingPlants = this.plants.countActive();
+        const score = this.zombiesKilled * 100 + remainingPlants * 50;
+        return { score, zombiesKilled: this.zombiesKilled, remainingPlants };
+    }
+
+    saveScore(score) {
+        const scores = JSON.parse(localStorage.getItem('plantVsZombieScores') || '[]');
+        scores.push({ score, date: new Date().toLocaleString() });
+        scores.sort((a, b) => b.score - a.score);
+        if (scores.length > 10) scores.length = 10;
+        localStorage.setItem('plantVsZombieScores', JSON.stringify(scores));
+        return scores[0].score;
     }
 
     winGame() {
         this.isWin = true;
         this.physics.pause();
-        this.showFinalScreen('草坪保卫战胜利！', '#ffd700');
+        const { score, zombiesKilled, remainingPlants } = this.calculateScore();
+        const highScore = this.saveScore(score);
+        this.showFinalScreen('草坪保卫战胜利！', '#ffd700', score, zombiesKilled, remainingPlants, highScore);
     }
 
     endGame() {
         this.gameOver = true;
         this.physics.pause();
-        this.showFinalScreen('僵尸吃掉了你的脑子...', '#ff5555');
+        const { score, zombiesKilled, remainingPlants } = this.calculateScore();
+        const highScore = this.saveScore(score);
+        this.showFinalScreen('僵尸吃掉了你的脑子...', '#ff5555', score, zombiesKilled, remainingPlants, highScore);
     }
 
-    showFinalScreen(msg, color) {
+    showFinalScreen(msg, color, score, zombiesKilled, remainingPlants, highScore) {
         const { width, height } = this.scale;
         const overlay = this.add.graphics();
         overlay.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.85);
         overlay.fillRect(0, 0, width, height);
 
-        this.add.text(width / 2, height / 2 - 120, msg, {
+        this.add.text(width / 2, height / 2 - 200, msg, {
             fontSize: '64px', fontFamily: 'ZCOOL KuaiLe', fill: color, stroke: '#000000', strokeThickness: 10
         }).setOrigin(0.5);
 
-        const btn = this.add.container(width / 2, height / 2 + 100);
+        const panel = this.add.graphics();
+        panel.fillStyle(0x1a1a2e, 0.9);
+        panel.fillRoundedRect(width / 2 - 250, height / 2 - 150, 500, 280, 20);
+        panel.lineStyle(3, color, 0.5);
+        panel.strokeRoundedRect(width / 2 - 250, height / 2 - 150, 500, 280, 20);
+
+        this.add.text(width / 2, height / 2 - 100, '本局得分', {
+            fontSize: '28px', fontFamily: 'ZCOOL KuaiLe', fill: '#aaaaaa'
+        }).setOrigin(0.5);
+
+        this.add.text(width / 2, height / 2 - 50, score.toString(), {
+            fontSize: '64px', fontFamily: 'ZCOOL KuaiLe', fill: '#ffd700', stroke: '#000000', strokeThickness: 6
+        }).setOrigin(0.5);
+
+        this.add.text(width / 2, height / 2 + 10, `击杀僵尸: ${zombiesKilled} × 100 = ${zombiesKilled * 100}`, {
+            fontSize: '22px', fontFamily: 'Outfit', fill: '#ffffff'
+        }).setOrigin(0.5);
+
+        this.add.text(width / 2, height / 2 + 45, `剩余植物: ${remainingPlants} × 50 = ${remainingPlants * 50}`, {
+            fontSize: '22px', fontFamily: 'Outfit', fill: '#ffffff'
+        }).setOrigin(0.5);
+
+        this.add.text(width / 2, height / 2 + 85, `历史最高: ${highScore}`, {
+            fontSize: '24px', fontFamily: 'ZCOOL KuaiLe', fill: '#ff6b6b'
+        }).setOrigin(0.5);
+
+        const btn = this.add.container(width / 2, height / 2 + 190);
         const bg = this.add.graphics();
         bg.fillStyle(0x4caf50, 1);
         bg.fillRoundedRect(-160, -45, 320, 90, 25);
