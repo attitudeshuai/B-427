@@ -7,7 +7,7 @@ export class UIScene extends Phaser.Scene {
     }
 
     create() {
-        const { height } = this.scale;
+        const { width, height } = this.scale;
 
         // Wider Sidebar for 3 columns (Total width ~220)
         const sidebarWidth = 220;
@@ -38,6 +38,7 @@ export class UIScene extends Phaser.Scene {
         cardSidebar.fillRoundedRect(10, 110, sidebarWidth - 20, height - 125, 15);
 
         this.createPlantCards(sidebarWidth);
+        this.createLeaderboardButton(sidebarWidth, height);
 
         this.registry.events.on('changedata-sun', (parent, value) => {
             this.sunText.setText(value);
@@ -135,6 +136,124 @@ export class UIScene extends Phaser.Scene {
             } else {
                 card.setAlpha(1);
             }
+        });
+    }
+
+    createLeaderboardButton(sidebarWidth, height) {
+        const btn = this.add.container(sidebarWidth / 2, height - 45);
+        const bg = this.add.graphics();
+        bg.fillStyle(0xffd700, 0.9);
+        bg.fillRoundedRect(-90, -25, 180, 50, 15);
+
+        const txt = this.add.text(0, 0, '🏆 排行榜', {
+            fontSize: '20px',
+            fontFamily: 'ZCOOL KuaiLe',
+            fill: '#000000',
+            fontWeight: 'bold'
+        }).setOrigin(0.5);
+
+        btn.add([bg, txt]);
+        btn.setSize(180, 50);
+        btn.setInteractive({ useHandCursor: true });
+
+        btn.on('pointerover', () => { btn.setScale(1.05); });
+        btn.on('pointerout', () => { btn.setScale(1); });
+        btn.on('pointerdown', () => this.showLeaderboard());
+    }
+
+    getScores() {
+        return JSON.parse(localStorage.getItem('plantVsZombieScores') || '[]');
+    }
+
+    showLeaderboard() {
+        const { width, height } = this.scale;
+        const scores = this.getScores();
+        const elements = [];
+
+        const overlay = this.add.graphics();
+        overlay.fillStyle(0x000000, 0.8);
+        overlay.fillRect(0, 0, width, height);
+        elements.push(overlay);
+
+        const panel = this.add.graphics();
+        panel.fillStyle(0x1a1a2e, 0.95);
+        panel.fillRoundedRect(width / 2 - 220, height / 2 - 300, 440, 600, 20);
+        panel.lineStyle(3, 0xffd700, 0.6);
+        panel.strokeRoundedRect(width / 2 - 220, height / 2 - 300, 440, 600, 20);
+        elements.push(panel);
+
+        const title = this.add.text(width / 2, height / 2 - 250, '🏆 历史排行榜', {
+            fontSize: '36px',
+            fontFamily: 'ZCOOL KuaiLe',
+            fill: '#ffd700',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        elements.push(title);
+
+        if (scores.length === 0) {
+            const empty = this.add.text(width / 2, height / 2, '暂无记录，快去挑战吧！', {
+                fontSize: '24px',
+                fontFamily: 'ZCOOL KuaiLe',
+                fill: '#aaaaaa'
+            }).setOrigin(0.5);
+            elements.push(empty);
+        } else {
+            const medals = ['🥇', '🥈', '🥉'];
+            scores.slice(0, 10).forEach((entry, index) => {
+                const y = height / 2 - 180 + index * 48;
+                const medal = medals[index] || `${index + 1}.`;
+                const bgColor = index < 3 ? 0x2a2a4e : 0x222233;
+
+                const rowBg = this.add.graphics();
+                rowBg.fillStyle(bgColor, 0.8);
+                rowBg.fillRoundedRect(width / 2 - 190, y - 20, 380, 40, 8);
+                elements.push(rowBg);
+
+                const medalTxt = this.add.text(width / 2 - 170, y, medal, {
+                    fontSize: '20px',
+                    fontFamily: 'Outfit',
+                    fill: '#ffffff'
+                }).setOrigin(0, 0.5);
+                elements.push(medalTxt);
+
+                const scoreTxt = this.add.text(width / 2 - 100, y, entry.score.toString(), {
+                    fontSize: '24px',
+                    fontFamily: 'Outfit',
+                    fill: '#ffd700',
+                    fontWeight: 'bold'
+                }).setOrigin(0, 0.5);
+                elements.push(scoreTxt);
+
+                const dateTxt = this.add.text(width / 2 + 50, y, entry.date, {
+                    fontSize: '14px',
+                    fontFamily: 'Outfit',
+                    fill: '#888888'
+                }).setOrigin(0, 0.5);
+                elements.push(dateTxt);
+            });
+        }
+
+        const closeBtn = this.add.container(width / 2, height / 2 + 250);
+        const closeBg = this.add.graphics();
+        closeBg.fillStyle(0xe74c3c, 1);
+        closeBg.fillRoundedRect(-100, -30, 200, 60, 15);
+
+        const closeTxt = this.add.text(0, 0, '关闭', {
+            fontSize: '22px',
+            fontFamily: 'ZCOOL KuaiLe',
+            fill: '#ffffff'
+        }).setOrigin(0.5);
+
+        closeBtn.add([closeBg, closeTxt]);
+        closeBtn.setSize(200, 60);
+        closeBtn.setInteractive({ useHandCursor: true });
+        elements.push(closeBtn);
+
+        closeBtn.on('pointerover', () => { closeBtn.setScale(1.05); });
+        closeBtn.on('pointerout', () => { closeBtn.setScale(1); });
+        closeBtn.on('pointerdown', () => {
+            elements.forEach(el => el.destroy());
         });
     }
 }
