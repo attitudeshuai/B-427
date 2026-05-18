@@ -18,6 +18,7 @@ export class PlayScene extends Phaser.Scene {
         this.zombieSpawnRate = config.zombieSpawnRate;
         this.zombiesSpawned = 0;
         this.zombiesTarget = 50; // More zombies for the all-star cast
+        this.zombiesKilled = 0;
     }
 
     create() {
@@ -310,7 +311,10 @@ export class PlayScene extends Phaser.Scene {
                 const dist = Phaser.Math.Distance.Between(x, y, zombie.x, zombie.y);
                 if (dist < radius) {
                     zombie.hp -= damage;
-                    if (zombie.hp <= 0) zombie.destroy();
+                    if (zombie.hp <= 0) {
+                        zombie.destroy();
+                        this.zombiesKilled++;
+                    }
                 }
             }
         });
@@ -369,19 +373,65 @@ export class PlayScene extends Phaser.Scene {
 
         if (zombie.hp <= 0) {
             zombie.destroy();
+            this.zombiesKilled++;
         }
     }
 
     winGame() {
         this.isWin = true;
         this.physics.pause();
-        this.showFinalScreen('草坪保卫战胜利！', '#ffd700');
+        this.finishGame('草坪保卫战胜利！', '#ffd700');
     }
 
     endGame() {
         this.gameOver = true;
         this.physics.pause();
-        this.showFinalScreen('僵尸吃掉了你的脑子...', '#ff5555');
+        this.finishGame('僵尸吃掉了你的脑子...', '#ff5555');
+    }
+
+    finishGame(msg, color) {
+        const plantsRemaining = this.plants.countActive();
+        const killScore = this.zombiesKilled * 100;
+        const plantScore = plantsRemaining * 50;
+        const winBonus = this.isWin ? 500 : 0;
+        const totalScore = killScore + plantScore + winBonus;
+
+        const leaderboard = this.loadLeaderboard();
+        const entry = {
+            score: totalScore,
+            kills: this.zombiesKilled,
+            plantsRemaining,
+            isWin: this.isWin,
+            date: new Date().toLocaleString('zh-CN', { hour12: false })
+        };
+        leaderboard.push(entry);
+        leaderboard.sort((a, b) => b.score - a.score);
+        const top10 = leaderboard.slice(0, 10);
+        localStorage.setItem('leaderboard', JSON.stringify(top10));
+
+        this.registry.set('finalResult', {
+            msg,
+            color,
+            score: totalScore,
+            killScore,
+            plantScore,
+            winBonus,
+            zombiesKilled: this.zombiesKilled,
+            plantsRemaining,
+            isWin: this.isWin,
+            leaderboard: top10
+        });
+
+        this.showFinalScreen(msg, color);
+    }
+
+    loadLeaderboard() {
+        try {
+            const raw = localStorage.getItem('leaderboard');
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+            return [];
+        }
     }
 
     showFinalScreen(msg, color) {
