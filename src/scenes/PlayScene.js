@@ -17,7 +17,8 @@ export class PlayScene extends Phaser.Scene {
         this.isWin = false;
         this.zombieSpawnRate = config.zombieSpawnRate;
         this.zombiesSpawned = 0;
-        this.zombiesTarget = 50; // More zombies for the all-star cast
+        this.zombiesTarget = 50;
+        this.zombiesKilled = 0;
     }
 
     create() {
@@ -301,7 +302,6 @@ export class PlayScene extends Phaser.Scene {
     }
 
     explode(x, y, radius, damage) {
-        // Visual effect
         const circle = this.add.circle(x, y, radius, 0xff5500, 0.5);
         this.tweens.add({ targets: circle, scale: 1.5, alpha: 0, duration: 500, onComplete: () => circle.destroy() });
 
@@ -310,7 +310,10 @@ export class PlayScene extends Phaser.Scene {
                 const dist = Phaser.Math.Distance.Between(x, y, zombie.x, zombie.y);
                 if (dist < radius) {
                     zombie.hp -= damage;
-                    if (zombie.hp <= 0) zombie.destroy();
+                    if (zombie.hp <= 0) {
+                        this.zombiesKilled++;
+                        zombie.destroy();
+                    }
                 }
             }
         });
@@ -368,6 +371,7 @@ export class PlayScene extends Phaser.Scene {
         this.time.delayedCall(100, () => { if (zombie.active && !zombie.isSlowed) zombie.clearTint(); });
 
         if (zombie.hp <= 0) {
+            this.zombiesKilled++;
             zombie.destroy();
         }
     }
@@ -384,17 +388,71 @@ export class PlayScene extends Phaser.Scene {
         this.showFinalScreen('僵尸吃掉了你的脑子...', '#ff5555');
     }
 
+    calculateScore() {
+        const zombieScore = this.zombiesKilled * 100;
+        const plantCount = this.plants.countActive();
+        const plantScore = plantCount * 50;
+        const winBonus = this.isWin ? 500 : 0;
+        return { zombieScore, plantScore, winBonus, total: zombieScore + plantScore + winBonus, zombiesKilled: this.zombiesKilled, plantsAlive: plantCount };
+    }
+
+    saveToLeaderboard(scoreData) {
+        const STORAGE_KEY = 'pvz_leaderboard';
+        let leaderboard = [];
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) leaderboard = JSON.parse(raw);
+        } catch (e) { /* ignore */ }
+        leaderboard.push({
+            score: scoreData.total,
+            zombiesKilled: scoreData.zombiesKilled,
+            plantsAlive: scoreData.plantsAlive,
+            isWin: this.isWin,
+            date: new Date().toLocaleDateString('zh-CN')
+        });
+        leaderboard.sort((a, b) => b.score - a.score);
+        leaderboard = leaderboard.slice(0, 10);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(leaderboard));
+        return leaderboard;
+    }
+
     showFinalScreen(msg, color) {
+        const scoreData = this.calculateScore();
+        const leaderboard = this.saveToLeaderboard(scoreData);
+        this.registry.set('lastScoreData', scoreData);
+        this.registry.set('leaderboard', leaderboard);
+
+        const uiScene = this.scene.get('UIScene');
+        if (uiScene && uiScene.scene.isActive()) {
+            uiScene.showScorePanel(scoreData, leaderboard);
+        }
+
         const { width, height } = this.scale;
         const overlay = this.add.graphics();
         overlay.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.85);
         overlay.fillRect(0, 0, width, height);
 
-        this.add.text(width / 2, height / 2 - 120, msg, {
-            fontSize: '64px', fontFamily: 'ZCOOL KuaiLe', fill: color, stroke: '#000000', strokeThickness: 10
+        this.add.text(width / 2, height / 2 - 200, msg, {
+            fontSize: '56px', fontFamily: 'ZCOOL KuaiLe', fill: color, stroke: '#000000', strokeThickness: 8
         }).setOrigin(0.5);
 
-        const btn = this.add.container(width / 2, height / 2 + 100);
+        const scoreY = height / 2 - 110;
+        this.add.text(width / 2, scoreY, `击杀僵尸: ${scoreData.zombiesKilled}  ×100 = ${scoreData.zombieScore}`, {
+            fontSize: '24px', fontFamily: 'ZCOOL KuaiLe', fill: '#cccccc', stroke: '#000000', strokeThickness: 4
+        }).setOrigin(0.5);
+        this.add.text(width / 2, scoreY + 36, `剩余植物: ${scoreData.plantsAlive}  ×50 = ${scoreData.plantScore}`, {
+            fontSize: '24px', fontFamily: 'ZCOOL KuaiLe', fill: '#cccccc', stroke: '#000000', strokeThickness: 4
+        }).setOrigin(0.5);
+        if (scoreData.winBonus > 0) {
+            this.add.text(width / 2, scoreY + 72, `通关奖励: +${scoreData.winBonus}`, {
+                fontSize: '24px', fontFamily: 'ZCOOL KuaiLe', fill: '#ffd700', stroke: '#000000', strokeThickness: 4
+            }).setOrigin(0.5);
+        }
+        this.add.text(width / 2, scoreY + 115, `本局总分: ${scoreData.total}`, {
+            fontSize: '36px', fontFamily: 'ZCOOL KuaiLe', fill: '#ffd700', stroke: '#000000', strokeThickness: 6
+        }).setOrigin(0.5);
+
+        const btn = this.add.container(width / 2, height / 2 + 160);
         const bg = this.add.graphics();
         bg.fillStyle(0x4caf50, 1);
         bg.fillRoundedRect(-160, -45, 320, 90, 25);
